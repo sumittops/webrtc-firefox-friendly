@@ -17,27 +17,30 @@
 				</form>
 		</div>
 		<div id="chatWrap" class="wraps">
-			<div id="chatBox">
-				<h3>Chat Box</h3>
-				<div id="chatScroll">
-				<ul>
-				</ul>
-				</div>
-				<form id="chatBox">
-				<input type="text" id="message" placeholder="Your Message"/>
-				<input type="submit" value="Send"/>
-				</form>
-			</div>
+		
 			<div>
 				<h3>Connected now!</h3>
+				<div class="scrollable">
 				<ul id="userList">
 				</ul>
+				</div>
 			</div>
 			<div>
 				<h3>Video Chat</h3>
 				<p>Enter user name for remote user</p>
 				<input type="text" id="remoteUser"/>
 				<button id="connect">Connect</button>
+			</div>
+				<div id="chatBox">
+				<h3>Chat Box</h3>
+				<div id="chatScroll" class="scrollable">
+				<ul>
+				</ul>
+				</div>
+				<form id="chatForm">
+				<input type="text" id="message" placeholder="Your Message"/>
+				<input type="submit" value="Send"/>
+				</form>
 			</div>
 		</div>
 		<div id="video-chat" align="center">

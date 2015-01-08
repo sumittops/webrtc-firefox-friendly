@@ -19,6 +19,11 @@ h3{
 	background:rgba(33,33,33,0.5);
 	display:none;
 }
+#chatForm{
+	bottom:0;left:0;
+	width:100%;
+	padding-bottom:3px;
+}
 #chatWrap{
 	display:none;
 	width:100%;
@@ -33,15 +38,18 @@ h3{
 	background:#dfdfdf;
 	height:100%;
 }
-#chatScroll{
-	height:75%;
+.scrollable{
 	overflow-y:scroll;
 }
+#chatScroll{
+	height:50%;
+}
 #chatScroll ul, #userList{
-	list-style:none;	
+	list-style:none;	margin: 0 auto;
 }
 #userList>li{
-	background:#99CC00;color:#FCFCFC;margin-top:3px;
+	background:#abcdef;color:#FCFCFC;margin-top:3px;
+	margin-right:5px;
 }
 video{
 	float:left;

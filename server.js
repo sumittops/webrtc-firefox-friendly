@@ -5,7 +5,6 @@ var http = require('http').createServer(app).listen(process.env.PORT||3000,funct
 });
 var io = require('socket.io').listen(http);
 var userlist = {};
-var liveVideoCalls = {};
 app.use(express.static(__dirname+'/static/'));
 app.get('/',function(req,res){
 	res.sendFile(__dirname+'/static/index.html');
@@ -31,7 +30,7 @@ io.sockets.on('connection',function(socket){
 			return;
 		delete userlist[socket.username];
 		updateUserList();
-	});
+	});	
 	socket.on('new message',function(data){
 		io.sockets.emit('message',{name:socket.username, msg:data});
 	});

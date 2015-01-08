@@ -3,28 +3,36 @@ $(document).ready(function(){
 			var $chatWrap = $('#chatWrap');
 			var $loginWrap = $('#loginWrap');
 			var $loginForm = $('#loginForm');
-			var $chatForm = $('#chatBox');
+			var $chatForm = $('#chatForm');
 			var $msg = $('#message');
 			var $username = $('#name');
 			var $chatScoll = $('#chatScroll').find('ul');
 			var self;
-			$loginForm.on('submit',function(e){
-				e.preventDefault();
-				$newUser = $username.val();
-				self = $newUser;
-				console.log('want to connect as '+$newUser);
-				if($newUser != ''){
-					$(this).disabled = true;
-					socket.emit('new user',$newUser,function(data){
+			if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+				$('#chatWrap >div').css('width','100%');
+				$('#chatWrap >div').css('height','66%');
+				$('#chatWrap >div').css('float','bottom');
+			}
+			function loginUser(newUser){
+				socket.emit('new user',newUser,function(data){
 						if(data){
 							$chatWrap.slideDown();
 							$loginWrap.slideUp();
-							$('#title').html('ChatApp v0.0.2 - Welcome, '+$newUser);
+							$('#title').html('ChatApp v0.0.2 - Welcome, '+newUser);
 							$username.val('');
 						}else{
 							$('#loginMsg').html('Sorry! A user by that name already exists. Try some other name.');
 						}
 					});
+			}
+			$loginForm.on('submit',function(e){
+				e.preventDefault();
+				var newUser = $username.val();
+				self = newUser;
+				console.log('want to connect as '+newUser);
+				if(newUser != ''){
+					$(this).disabled = true;
+					loginUser(newUser);
 				}else{
 						$('#loginMsg').html('Please enter a valid username to connect.');
 						$(this).disabled = false;
@@ -61,23 +69,35 @@ var isStarted = false;
 //the PeerConnection object
 var pc;
 //PeerConnection ICE protocol configuration for chrome
-var pc_config = {'iceServers':[{'url':'stun:stun.l.google.com:19302'}]};
+var isChrome = !!navigator.webkitGetUserMedia;
+var STUN = {
+	url: isChrome ? 'stun:stun.l.google.com:19302' :'stun:23.21.150.121'
+};
+var TURN = { url: 'turn:numb.viagenie.ca',
+    credential: 'muazkh',
+    username: 'webrtc@live.com'};
+
+var pc_config = {'iceServers':[STUN,TURN]};
 var pc_constraints = {
 	'optional':[{'DtlsSrtpKeyAgreement':true}]
 };
 var sdpConstraints = {};
+
 var remoteUser = '';
 function callerSuccess(mediaStream){
 	localStream = mediaStream;
-	localVideoElement.src = webkitURL.createObjectURL(mediaStream);
-	pc = new webkitRTCPeerConnection(pc_config,pc_constraints);
+	localVideoElement.src = window.URL.createObjectURL(mediaStream);
+	if(isChrome)
+		pc = new webkitRTCPeerConnection(pc_config,pc_constraints);
+	else
+		pc = new mozRTCPeerConnection(pc_config,pc_constraints);
 	console.log('Peer connection created '+pc);
 	pc.addStream(mediaStream);
 	
 	pc.onaddstream = function(streamEvent){
 		remoteStream = streamEvent.stream;
 		console.log('Remote Stream: '+remoteStream);
-		remoteVideoElement.src =  webkitURL.createObjectURL(streamEvent.stream);
+		remoteVideoElement.src =  window.URL.createObjectURL(streamEvent.stream);
 		$('#callStatus').html('Call in progress...');
 	};
 	pc.onicecandidate = function(e){
@@ -109,6 +129,7 @@ $('#connect').on('click',function(){
 			console.log('Call request from '+self+' to '+remoteUser);
 			$('#video-chat').slideDown();
 			$('#cover').fadeIn();
+			$('#callStatus').html('Calling...Waiting for the remote user\'s response.');
 			socket.emit('newVideoChatRequest',{sender:self,receiver:remoteUser},function(data){
 				$('#remoteUser').val('');
 				if(data.response){
@@ -151,33 +172,63 @@ function remoteHangup(){
 		pc.close(); 
 		pc = null;
 	}
-	if(remoteStream){
-		remoteStream.stop();
-	}
-	if(localStream){
-		localStream.stop();
-	}
+	
 	isStarted = false;
 	remoteUser = '';
+	localStream = null;
+	remoteStream = null;
 	$('#callStatus').html('Call ended!');
 	$('#video-chat').slideUp('slow');
 	$('#cover').fadeOut();
+	if(remoteStream){
+			remoteStream.stop();
+	}
+	if(localStream){
+			localStream.stop();
+	}
 }
 //Code for answerer!!
 
 
-function createAnswer(offerSDP){
 
+function gumInitiationForReceiver(){
+	navigator.getUserMedia({video:true,audio:true},answererSuccess,errorCallback);
+}
+function answererSuccess(mediaStream){
+	localStream = mediaStream;
+	localVideoElement.src =  window.URL.createObjectURL(mediaStream);
+	if(isChrome)
+		pc = new webkitRTCPeerConnection(pc_config,pc_constraints);
+	else
+		pc = new mozRTCPeerConnection(pc_config,pc_constraints);
+	console.log('Peer connection created '+pc);
+	pc.addStream(mediaStream);
+	pc.onaddstream = function(streamEvent){
+		remoteStream = streamEvent.stream;
+		console.log('Remote Media Stream: '+ remoteStream);
+		remoteVideoElement.src =  window.URL.createObjectURL(streamEvent.stream);
+		$('#callStatus').html('Call in progress...');
+	};
+	pc.onicecandidate = function(e){
+		var candidate = e.candidate;
+		if(candidate){
+			socket.emit('candidate',{targetUser:remoteUser, candidate:candidate});
+		}
+	};
+}
+function createAnswer(offerSDP){
 	//first set remote descriptions based on offerSDP
-	var remoteDescription = new RTCSessionDescription(offerSDP);
+	if(isChrome)
+		var remoteDescription = new RTCSessionDescription(offerSDP);
+	else
+		var remoteDescription = new mozRTCSessionDescription(offerSDP);
 	pc.setRemoteDescription(remoteDescription);
 	pc.createAnswer(function(answerSDP){
 		pc.setLocalDescription(answerSDP);
 		socket.emit('answersdp',{targetUser:remoteUser,answerSDP:answerSDP});
 	},function(e){alert('something wrong happened :'+e);},sdpConstraints);
 	
-};
-
+}
 socket.on('newVideoCallRequest',function(data,callback){
 console.log('New Video Call Request. Current call started status :'+isStarted);
 if(!isStarted){
@@ -193,26 +244,8 @@ if(!isStarted){
 		$('#video-chat').slideDown();
 		$('#video-chat').children('h3').css('background-color','#99CC00');
 		$('#callStatus').html('Call accepted. Initiating video call now. Please, allow Media Access when asked for.');
-		navigator.getUserMedia({video:true,audio:true},answererSuccess,errorCallback);
-		function answererSuccess(mediaStream){
-		localStream = mediaStream;
-		localVideoElement.src =  webkitURL.createObjectURL(mediaStream);
-		pc = new webkitRTCPeerConnection(pc_config,pc_constraints);
-		console.log('Peer connection created '+pc);
-		pc.addStream(mediaStream);
-		pc.onaddstream = function(streamEvent){
-			remoteStream = streamEvent.stream;
-			console.log('Remote Media Stream: '+ remoteStream);
-			remoteVideoElement.src =  webkitURL.createObjectURL(streamEvent.stream);
-			$('#callStatus').html('Call in progress...');
-		};
-		pc.onicecandidate = function(e){
-			var candidate = e.candidate;
-			if(candidate){
-				socket.emit('candidate',{targetUser:remoteUser, candidate:candidate});
-			}
-		};
-		}
+		gumInitiationForReceiver();
+		
 	});
 	$div.on('click','.red',function(){
 		isStarted = false;
@@ -227,7 +260,10 @@ if(!isStarted){
 //Handlers for sockets
 socket.on('candidate',function(data){
 	if(pc)
-		pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+		if(isChrome)
+			pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+		else
+			pc.addIceCandidate(new mozRTCIceCandidate(data.candidate));
 });
 socket.on('offersdp',function(data){
 	console.log(self+':: offer received. target user is ' + data.targetUser);
@@ -239,7 +275,10 @@ socket.on('offersdp',function(data){
 socket.on('answersdp',function(data){
 	if(data.targetUser == self && data.answerSDP){
 		console.log('Offerer reaches here. Not the receiver.');
-		var remoteDescription = new RTCSessionDescription(data.answerSDP);
+		if(isChrome)
+			var remoteDescription = new RTCSessionDescription(data.answerSDP);
+		else
+			var remoteDescription = new mozRTCSessionDescription(data.answerSDP);
 		pc.setRemoteDescription(remoteDescription);
 	}
 });
